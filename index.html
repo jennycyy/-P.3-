@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>供詞填空打地鼠遊戲</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Tone.js for Audio Synth -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', '"Zen Maru Gothic"', 'sans-serif'],
+                        game: ['"Zen Maru Gothic"', 'sans-serif'],
+                    },
+                    colors: {
+                        mole: {
+                            grass: '#4ade80',
+                            dirt: '#854d0e',
+                            hole: '#3f2208',
+                            wood: '#b45309',
+                        }
+                    },
+                    animation: {
+                        'bounce-short': 'bounceShort 0.3s ease-in-out',
+                        'shake': 'shake 0.4s cubic-bezier(.36,.07,.19,.97) both',
+                        'pop-up': 'popUp 0.25s ease-out forwards',
+                        'pop-down': 'popDown 0.25s ease-in forwards',
+                    },
+                    keyframes: {
+                        bounceShort: {
+                            '0%, 100%': { transform: 'scale(1)' },
+                            '50%': { transform: 'scale(1.15)' },
+                        },
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-2px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(4px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-6px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(6px, 0, 0)' },
+                        },
+                        popUp: {
+                            '0%': { transform: 'translateY(100%) scale(0.6)', opacity: '0' },
+                            '100%': { transform: 'translateY(0) scale(1)', opacity: '1' }
+                        },
+                        popDown: {
+                            '0%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+                            '100%': { transform: 'translateY(100%) scale(0.6)', opacity: '0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+            touch-action: manipulation;
+        }
+
+        /* Custom Hammer Cursor Effect for ALL elements */
+        *, html, body, button, div, p, span, section, header, main, a, .mole-wrapper, .hole-container {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg transform='rotate(-20 24 24)'%3E%3Crect x='10' y='6' width='22' height='14' rx='3' fill='%23f97316' stroke='%237c2d12' stroke-width='2'/%3E%3Cpath d='M8 10 h26 v6 h-26 z' fill='%23fbbf24'/%3E%3Cpath d='M18 19 L28 42 C29 44 32 44 33 42 L37 38 C38 37 38 34 36 33 L25 19 Z' fill='%23b45309' stroke='%2378350f' stroke-width='2'/%3E%3Cpath d='M28 34 L34 40' stroke='%23fde68a' stroke-width='2' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E") 8 8, pointer !important;
+        }
+
+        /* Active click swing cursor state */
+        *:active {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cg transform='rotate(-55 24 24)'%3E%3Crect x='10' y='6' width='22' height='14' rx='3' fill='%23dc2626' stroke='%237f1d1d' stroke-width='2'/%3E%3Cpath d='M8 10 h26 v6 h-26 z' fill='%23f59e0b'/%3E%3Cpath d='M18 19 L28 42 C29 44 32 44 33 42 L37 38 C38 37 38 34 36 33 L25 19 Z' fill='%23b45309' stroke='%2378350f' stroke-width='2'/%3E%3Cpath d='M28 34 L34 40' stroke='%23fde68a' stroke-width='2' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E") 8 8, pointer !important;
+        }
+
+        .mole-hole {
+            perspective: 1000px;
+            box-shadow: inset 0 10px 15px -3px rgba(0, 0, 0, 0.6), inset 0 -4px 6px -2px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Whack Particle & Hammer Swing Animation Effect */
+        .whack-effect {
+            pointer-events: none;
+            position: fixed;
+            animation: whackPop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes whackPop {
+            0% { transform: scale(0.6) rotate(-20deg); opacity: 1; }
+            50% { transform: scale(1.3) rotate(25deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 0; }
+        }
+
+        /* Penalty Overlay Pulse */
+        .penalty-active {
+            animation: pulseRed 1s infinite alternate;
+        }
+
+        @keyframes pulseRed {
+            from { background-color: rgba(239, 68, 68, 0.25); }
+            to { background-color: rgba(185, 28, 28, 0.45); }
+        }
+
+        /* Floating Score Animation */
+        .float-text {
+            position: absolute;
+            font-weight: 900;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.4); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 text-slate-800 font-sans hammer-cursor">
+
+    <!-- Top Bar Navigation / Header -->
+    <header class="w-full max-w-4xl flex items-center justify-between bg-white/80 backdrop-blur-md px-4 py-3 rounded-2xl shadow-lg border border-white/60 mb-3">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-white text-xl font-black shadow-md">
+                <i class="fa-solid fa-gavel"></i>
+            </div>
+            <div>
+                <h1 class="text-lg sm:text-xl font-black text-amber-900 leading-tight">供詞填空打地鼠</h1>
+                <p class="text-xs text-amber-700 font-bold hidden sm:block">看題目・擊中正確地鼠！</p>
+            </div>
+        </div>
+
+        <!-- Controls: Sound, Vocab List, Restart -->
+        <div class="flex items-center space-x-2">
+            <button id="btn-vocab" onclick="openVocabModal()" class="px-3 py-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-xl font-bold text-sm transition flex items-center gap-1.5 shadow-sm active:scale-95">
+                <i class="fa-solid fa-book-open"></i>
+                <span class="hidden md:inline">詞語表</span>
+            </button>
+            <button id="btn-sound" onclick="toggleSound()" class="w-9 h-9 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition flex items-center justify-center shadow-sm active:scale-95">
+                <i id="sound-icon" class="fa-solid fa-volume-high text-emerald-600"></i>
+            </button>
+            <button onclick="restartGame()" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-sm transition flex items-center gap-1 shadow-md active:scale-95">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>重來</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME AREA -->
+    <main class="w-full max-w-4xl flex-1 flex flex-col items-center justify-start gap-3">
+
+        <!-- Game Stats Bar -->
+        <div class="w-full grid grid-cols-3 gap-2 sm:gap-4 max-w-2xl">
+            <!-- Score Card -->
+            <div class="bg-white/90 rounded-2xl p-2.5 sm:p-3 text-center shadow-md border border-amber-100 flex flex-col justify-center items-center">
+                <span class="text-xs text-amber-800 font-bold tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-trophy text-amber-500"></i> 當前得分
+                </span>
+                <span id="score-val" class="text-2xl sm:text-3xl font-black text-amber-600 tracking-tight">0</span>
+            </div>
+
+            <!-- Timer Card -->
+            <div class="bg-white/90 rounded-2xl p-2.5 sm:p-3 text-center shadow-md border border-blue-100 flex flex-col justify-center items-center">
+                <span class="text-xs text-blue-800 font-bold tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-clock text-blue-500"></i> 剩餘時間
+                </span>
+                <span id="timer-val" class="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight">60s</span>
+            </div>
+
+            <!-- Streak/Combo Card -->
+            <div class="bg-white/90 rounded-2xl p-2.5 sm:p-3 text-center shadow-md border border-rose-100 flex flex-col justify-center items-center">
+                <span class="text-xs text-rose-800 font-bold tracking-wider flex items-center gap-1">
+                    <i class="fa-solid fa-fire text-rose-500"></i> 連擊 Combo
+                </span>
+                <span id="combo-val" class="text-2xl sm:text-3xl font-black text-rose-500 tracking-tight">0</span>
+            </div>
+        </div>
+
+        <!-- Question Box -->
+        <section class="w-full max-w-2xl bg-white rounded-3xl p-4 sm:p-5 shadow-xl border-4 border-amber-300 relative overflow-hidden flex flex-col items-center">
+            <div class="absolute top-0 left-0 bg-amber-400 text-amber-950 font-black text-xs px-3 py-1 rounded-br-2xl uppercase tracking-wider flex items-center gap-1">
+                <i class="fa-solid fa-question-circle"></i> 第 <span id="question-num">1</span> / 12 題
+            </div>
+
+            <div class="mt-3 w-full text-center">
+                <p id="question-text" class="text-lg sm:text-2xl font-black text-slate-800 leading-relaxed tracking-wide px-2 py-2">
+                    <!-- Dynamic Question Text with Blank Space -->
+                    載入題目中...
+                </p>
+            </div>
+
+            <div class="mt-2 text-xs text-slate-500 font-bold flex items-center gap-1.5 bg-slate-100 px-3 py-1 rounded-full">
+                <i class="fa-solid fa-hand-pointer text-amber-500 animate-bounce"></i>
+                找尋底下帶有正解地鼠，迅速點擊它！
+            </div>
+        </section>
+
+        <!-- 3x3 Whac-A-Mole Grid Area -->
+        <section class="relative w-full max-w-2xl bg-emerald-700 p-3 sm:p-5 rounded-3xl shadow-2xl border-4 border-emerald-800 flex flex-col items-center my-1">
+            <!-- Grass background decorations -->
+            <div class="absolute top-2 left-4 text-emerald-500 text-sm select-none"><i class="fa-solid fa-seedling"></i></div>
+            <div class="absolute top-3 right-6 text-emerald-500 text-sm select-none"><i class="fa-solid fa-seedling"></i></div>
+            <div class="absolute bottom-2 left-8 text-emerald-500 text-sm select-none"><i class="fa-solid fa-seedling"></i></div>
+
+            <!-- 3x3 Grid -->
+            <div class="grid grid-cols-3 gap-2 sm:gap-4 w-full aspect-square max-h-[460px]">
+                <!-- 9 Holes generated dynamically or pre-placed -->
+                <!-- Hole 0 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-0">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-0">
+                        <!-- Mole SVG & Word Tag -->
+                    </div>
+                </div>
+
+                <!-- Hole 1 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-1">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-1">
+                    </div>
+                </div>
+
+                <!-- Hole 2 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-2">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-2">
+                    </div>
+                </div>
+
+                <!-- Hole 3 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-3">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-3">
+                    </div>
+                </div>
+
+                <!-- Hole 4 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-4">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-4">
+                    </div>
+                </div>
+
+                <!-- Hole 5 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-5">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-5">
+                    </div>
+                </div>
+
+                <!-- Hole 6 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-6">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-6">
+                    </div>
+                </div>
+
+                <!-- Hole 7 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-7">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-7">
+                    </div>
+                </div>
+
+                <!-- Hole 8 -->
+                <div class="hole-container relative overflow-hidden bg-amber-950/90 rounded-3xl border-4 border-amber-900 mole-hole flex items-end justify-center" id="hole-8">
+                    <div class="dirt-mound absolute bottom-0 w-full h-1/3 bg-amber-800/80 rounded-b-2xl border-t-2 border-amber-700 z-20 pointer-events-none"></div>
+                    <div class="mole-wrapper absolute bottom-0 w-full h-full flex flex-col items-center justify-end z-10 transition-transform duration-200 translate-y-full" id="mole-8">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3-Second Wrong Answer Penalty Overlay -->
+            <div id="penalty-overlay" class="hidden absolute inset-0 z-30 rounded-3xl bg-rose-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-white text-center p-4 transition-all">
+                <div class="w-16 h-16 bg-rose-500 rounded-full flex items-center justify-center text-3xl mb-2 animate-bounce">
+                    <i class="fa-solid fa-xmark"></i>
+                </div>
+                <h3 class="text-2xl font-black mb-1">答錯了！暫停懲罰</h3>
+                <p class="text-sm text-rose-100 font-bold mb-3">需等待懲罰時間結束後再次嘗試</p>
+                <div class="flex items-center gap-2">
+                    <span id="penalty-countdown" class="text-5xl font-black text-amber-300">3</span>
+                    <span class="text-lg font-bold">秒</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Vocabulary List Reference -->
+    <div id="vocab-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border-4 border-amber-300 max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                <h2 class="text-xl font-black text-amber-900 flex items-center gap-2">
+                    <i class="fa-solid fa-book text-amber-500"></i> 本關 12 個供詞填空詞語
+                </h2>
+                <button onclick="closeVocabModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="overflow-y-auto flex-1 pr-1 space-y-2" id="vocab-modal-list">
+                <!-- Dynamically filled with word tags & explanations -->
+            </div>
+
+            <div class="mt-4 pt-3 border-t text-center">
+                <button onclick="closeVocabModal()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-black text-base shadow-lg transition">
+                    回到遊戲
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Game Over / Summary -->
+    <div id="gameover-modal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border-4 border-amber-400 text-center flex flex-col items-center">
+            <div class="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center text-amber-500 text-4xl mb-3 border-4 border-amber-300">
+                <i class="fa-solid fa-crown animate-bounce"></i>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-black text-slate-800 mb-1">挑戰結束！</h2>
+            <p id="gameover-subtitle" class="text-sm font-bold text-slate-500 mb-4">太棒了！完成供詞填空遊戲！</p>
+
+            <div class="grid grid-cols-2 gap-3 w-full mb-5">
+                <div class="bg-amber-50 p-3 rounded-2xl border border-amber-200">
+                    <span class="text-xs font-bold text-amber-700 block">最終得分</span>
+                    <span id="final-score" class="text-3xl font-black text-amber-600">0</span>
+                </div>
+                <div class="bg-emerald-50 p-3 rounded-2xl border border-emerald-200">
+                    <span class="text-xs font-bold text-emerald-700 block">答對題數</span>
+                    <span id="final-correct" class="text-3xl font-black text-emerald-600">0 / 12</span>
+                </div>
+            </div>
+
+            <div class="w-full bg-slate-50 p-3 rounded-2xl text-left border mb-5 max-h-40 overflow-y-auto">
+                <h4 class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">答題統計紀錄</h4>
+                <div id="gameover-log" class="space-y-1.5 text-xs">
+                    <!-- Dynamic review items -->
+                </div>
+            </div>
+
+            <button onclick="restartGame(); closeGameOverModal();" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-lg hover:shadow-xl transition flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> 重新挑戰
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ====================================================================
+           QUESTION BANK (12 SPECIFIED QUESTIONS & VOCABULARY)
+           ==================================================================== */
+        const QUESTIONS_BANK = [
+            {
+                id: 1,
+                question: "哥哥的腦筋靈活，總能想出許多好______來解決困難。",
+                answer: "點子",
+                hint: "指好主張、辦法或主意。"
+            },
+            {
+                id: 2,
+                question: "這間新開的文具店不但售賣______的文具，而且價格十分便宜，吸引了許多同學去光顧。",
+                answer: "各式各樣",
+                hint: "許多不同種類或樣式的。"
+            },
+            {
+                id: 3,
+                question: "魔術師的表演實在太精彩了，大家都對他精湛的技術佩服得______。",
+                answer: "五體投地",
+                hint: "比喻佩服到了極點。"
+            },
+            {
+                id: 4,
+                question: "為了順利完成常識科的專題研習，同學們不但到圖書館______資料，還親自到社區進行街頭訪問。",
+                answer: "搜集",
+                hint: "尋找並聚集在一起。"
+            },
+            {
+                id: 5,
+                question: "在開始寫作之前，老師建議我們先去借幾本好書來______，這樣寫出來的文章才會內容豐富。",
+                answer: "參考",
+                hint: "參看相關材料以作借鑑或比較。"
+            },
+            {
+                id: 6,
+                question: "為了考取好成績，家明每天都十分______地溫習功課。",
+                answer: "用功",
+                hint: "努力學習、下苦功。"
+            },
+            {
+                id: 7,
+                question: "當老師突然宣佈明天要進行測驗時，全班同學都______住了，過了好一會兒才反應過來。",
+                answer: "愣",
+                hint: "發呆、發愣，因出乎意料而反應遲鈍。"
+            },
+            {
+                id: 8,
+                question: "雜技演員在半空中完成了一個驚險的翻滾動作，讓台下的觀眾看得______。",
+                answer: "目瞪口呆",
+                hint: "形容因吃驚、害怕或發愣而張大眼睛發呆。"
+            },
+            {
+                id: 9,
+                question: "互聯網不僅是我們與朋友溝通的工具，更是我們認識世界和學習新事物的重要______。",
+                answer: "媒介",
+                hint: "使雙方發生聯繫或傳遞資訊的中介物。"
+            },
+            {
+                id: 10,
+                question: "只要我們平時多閱讀不同種類的圖書，就能學到課本以外的______，開闊自己的眼界。",
+                answer: "知識",
+                hint: "人類在實踐中認識世界獲得的經驗與學問。"
+            },
+            {
+                id: 11,
+                question: "因為小華這次考試取得了滿分，所以媽媽對他的表現十分______。",
+                answer: "滿意",
+                hint: "符合心意、感到滿足。"
+            },
+            {
+                id: 12,
+                question: "當這對雙胞胎兄弟異口同聲地說出同一個答案時，他們忍不住看著對方，露出了______的微笑。",
+                answer: "會心",
+                hint: "領會於心、彼此心領神會。"
+            }
+        ];
+
+        const ALL_VOCAB = QUESTIONS_BANK.map(q => q.answer);
+
+        /* ====================================================================
+           GAME STATE & VARIABLES
+           ==================================================================== */
+        let score = 0;
+        let combo = 0;
+        let timeLeft = 60;
+        let timerInterval = null;
+        let moleSpawnInterval = null;
+        let currentQuestionIndex = 0;
+        let randomizedQuestions = [];
+        let isPenalized = false;
+        let penaltyCountdownVal = 3;
+        let isSoundMuted = false;
+        let gameLog = [];
+        let activeMoles = Array(9).fill(null); // stores active word at each hole index
+
+        /* Helper: Fisher-Yates array shuffle for true randomness */
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        /* ====================================================================
+           AUDIO SYNTHESIZER (Tone.js & Web Audio API fallback)
+           ==================================================================== */
+        let synth, polySynth;
+
+        function initAudio() {
+            try {
+                if (window.Tone) {
+                    synth = new Tone.Synth({
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }
+                    }).toDestination();
+
+                    polySynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: "sine" },
+                        envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.3 }
+                    }).toDestination();
+                }
+            } catch (e) {
+                console.log("Audio init fallback", e);
+            }
+        }
+
+        function playSound(type) {
+            if (isSoundMuted || !Tone) return;
+            try {
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                const now = Tone.now();
+                if (type === 'correct') {
+                    // Cheerful major chord arpeggio
+                    polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6"], "8n", now);
+                } else if (type === 'wrong') {
+                    // Low buzz / bonk sound
+                    synth.triggerAttackRelease("A2", "8n", now);
+                } else if (type === 'pop') {
+                    // High soft click pop
+                    synth.triggerAttackRelease("G6", "16n", now);
+                } else if (type === 'victory') {
+                    polySynth.triggerAttackRelease(["C5", "E5", "G5", "C6", "E6"], "4n", now);
+                }
+            } catch (e) {
+                // audio safety
+            }
+        }
+
+        function toggleSound() {
+            isSoundMuted = !isSoundMuted;
+            const icon = document.getElementById('sound-icon');
+            if (isSoundMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-emerald-600';
+                initAudio();
+            }
+        }
+
+        /* ====================================================================
+           GAME INITIALIZATION & LOOP
+           ==================================================================== */
+        window.onload = function() {
+            initAudio();
+            populateVocabModalList();
+            restartGame();
+        };
+
+        function restartGame() {
+            clearInterval(timerInterval);
+            clearInterval(moleSpawnInterval);
+
+            score = 0;
+            combo = 0;
+            timeLeft = 90; // 90 seconds round
+            isPenalized = false;
+            gameLog = [];
+
+            // Randomly shuffle all 12 questions for this round
+            randomizedQuestions = shuffleArray(QUESTIONS_BANK);
+            currentQuestionIndex = 0;
+
+            updateStatsUI();
+            hidePenalty();
+            loadCurrentQuestion();
+
+            // Start timer
+            timerInterval = setInterval(() => {
+                if (!isPenalized) {
+                    timeLeft--;
+                    updateStatsUI();
+                    if (timeLeft <= 0) {
+                        endGame();
+                    }
+                }
+            }, 1000);
+
+            // Start Mole Spawning Loop
+            startMoleSpawning();
+        }
+
+        function updateStatsUI() {
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('timer-val').innerText = timeLeft + 's';
+            document.getElementById('combo-val').innerText = combo;
+        }
+
+        function loadCurrentQuestion() {
+            // Check if all 12 questions have been completed
+            if (currentQuestionIndex >= randomizedQuestions.length) {
+                endGame();
+                return;
+            }
+
+            const q = randomizedQuestions[currentQuestionIndex];
+            document.getElementById('question-num').innerText = (currentQuestionIndex + 1);
+
+            // Format Question Text with stylized blank space
+            const formattedText = q.question.replace('______', '<span class="inline-block px-3 py-0.5 mx-1 bg-amber-100 border-b-4 border-amber-500 rounded text-amber-900 font-black tracking-widest shadow-inner animate-pulse">______</span>');
+            document.getElementById('question-text').innerHTML = formattedText;
+
+            // Trigger immediate refresh of moles on board
+            refreshMolesWave();
+        }
+
+        /* ====================================================================
+           WHAC-A-MOLE LOGIC (3x3 GRID & POPPING)
+           ==================================================================== */
+        function startMoleSpawning() {
+            clearInterval(moleSpawnInterval);
+            // Cycle moles wave every 2.8 seconds
+            moleSpawnInterval = setInterval(() => {
+                if (!isPenalized) {
+                    refreshMolesWave();
+                }
+            }, 2800);
+            refreshMolesWave();
+        }
+
+        function refreshMolesWave() {
+            if (isPenalized || currentQuestionIndex >= randomizedQuestions.length) return;
+
+            const currentCorrectAnswer = randomizedQuestions[currentQuestionIndex].answer;
+
+            // Decide how many moles pop up (e.g. 4 to 6 moles out of 9)
+            const numMoles = Math.floor(Math.random() * 3) + 4; // 4, 5, or 6
+            const holeIndices = shuffleArray([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+            const selectedHoles = holeIndices.slice(0, numMoles);
+
+            // Ensure the Correct Answer is GUARANTEED to be in one of the popped moles!
+            const correctHoleIndex = selectedHoles[Math.floor(Math.random() * selectedHoles.length)];
+
+            // Generate wrong answers pool excluding the correct answer
+            const wrongAnswers = shuffleArray(ALL_VOCAB.filter(w => w !== currentCorrectAnswer));
+
+            // Clear all holes
+            for (let i = 0; i < 9; i++) {
+                const moleElem = document.getElementById(`mole-${i}`);
+                if (moleElem) {
+                    moleElem.classList.add('translate-y-full');
+                    moleElem.innerHTML = '';
+                    activeMoles[i] = null;
+                }
+            }
+
+            // Populate selected holes after brief delay
+            setTimeout(() => {
+                let wrongIdx = 0;
+                selectedHoles.forEach(hIndex => {
+                    let wordToShow = '';
+                    if (hIndex === correctHoleIndex) {
+                        wordToShow = currentCorrectAnswer;
+                    } else {
+                        wordToShow = wrongAnswers[wrongIdx % wrongAnswers.length];
+                        wrongIdx++;
+                    }
+
+                    activeMoles[hIndex] = wordToShow;
+                    renderMoleInHole(hIndex, wordToShow);
+                });
+            }, 150);
+        }
+
+        function renderMoleInHole(holeIndex, word) {
+            const moleWrapper = document.getElementById(`mole-${holeIndex}`);
+            if (!moleWrapper) return;
+
+            // Different mole expressions / hat colors for visual flair
+            const moleSvg = `
+                <div onclick="whackMole(${holeIndex}, '${word}', event)" class="cursor-pointer group flex flex-col items-center justify-end w-full h-full pb-1 transition-transform transform active:scale-90">
+                    <!-- Word Bubble / Tag -->
+                    <div class="z-30 bg-white border-2 border-amber-900 px-2 sm:px-3 py-1 rounded-2xl shadow-lg mb-1 flex items-center justify-center min-w-[70px] sm:min-w-[90px] group-hover:scale-105 transition-transform">
+                        <span class="text-sm sm:text-base font-black text-slate-900 tracking-wide select-none text-center">${word}</span>
+                    </div>
+
+                    <!-- Cute Mole SVG Body -->
+                    <div class="relative w-20 h-20 sm:w-24 sm:h-24">
+                        <svg viewBox="0 0 100 100" class="w-full h-full drop-shadow-md">
+                            <!-- Ears -->
+                            <circle cx="25" cy="25" r="10" fill="#78350f" />
+                            <circle cx="25" cy="25" r="6" fill="#fbcfe8" />
+                            <circle cx="75" cy="25" r="10" fill="#78350f" />
+                            <circle cx="75" cy="25" r="6" fill="#fbcfe8" />
+                            <!-- Head/Body -->
+                            <ellipse cx="50" cy="55" rx="35" ry="38" fill="#92400e" />
+                            <!-- Snout -->
+                            <ellipse cx="50" cy="62" rx="20" ry="14" fill="#fde68a" />
+                            <!-- Nose -->
+                            <ellipse cx="50" cy="54" rx="7" ry="5" fill="#1e293b" />
+                            <!-- Eyes -->
+                            <circle cx="36" cy="45" r="4" fill="#1e293b" />
+                            <circle cx="38" cy="43" r="1.5" fill="#ffffff" />
+                            <circle cx="64" cy="45" r="4" fill="#1e293b" />
+                            <circle cx="66" cy="43" r="1.5" fill="#ffffff" />
+                            <!-- Cute Cheek Blush -->
+                            <circle cx="28" cy="54" r="5" fill="#f43f5e" opacity="0.4" />
+                            <circle cx="72" cy="54" r="5" fill="#f43f5e" opacity="0.4" />
+                            <!-- Paws holding tag -->
+                            <ellipse cx="32" cy="82" rx="7" ry="5" fill="#fde68a" />
+                            <ellipse cx="68" cy="82" rx="7" ry="5" fill="#fde68a" />
+                        </svg>
+                    </div>
+                </div>
+            `;
+
+            moleWrapper.innerHTML = moleSvg;
+            // Pop UP Animation
+            moleWrapper.classList.remove('translate-y-full');
+            playSound('pop');
+        }
+
+        /* ====================================================================
+           WHACKING INTERACTION & RULE ENFORCEMENT
+           ==================================================================== */
+        function whackMole(holeIndex, chosenWord, event) {
+            if (isPenalized) return;
+
+            const currentQ = randomizedQuestions[currentQuestionIndex];
+            const isCorrect = (chosenWord === currentQ.answer);
+
+            // Trigger Visual Hammer / Explosion Burst Effect
+            createWhackEffect(event.clientX, event.clientY, isCorrect);
+
+            if (isCorrect) {
+                // Correct Answer!
+                playSound('correct');
+                score += 10;
+                combo++;
+
+                // Record log
+                gameLog.push({
+                    question: currentQ.question,
+                    chosen: chosenWord,
+                    correct: currentQ.answer,
+                    isRight: true
+                });
+
+                // Show floating text
+                showFloatingText(event.clientX, event.clientY, "+10 答對！", "text-emerald-500");
+
+                // Retract hit mole
+                const moleWrapper = document.getElementById(`mole-${holeIndex}`);
+                if (moleWrapper) moleWrapper.classList.add('translate-y-full');
+
+                updateStatsUI();
+
+                // Advance to Next Question after short beat
+                currentQuestionIndex++;
+                setTimeout(() => {
+                    if (currentQuestionIndex >= randomizedQuestions.length) {
+                        endGame();
+                    } else {
+                        loadCurrentQuestion();
+                    }
+                }, 350);
+
+            } else {
+                // Incorrect Answer!
+                playSound('wrong');
+                combo = 0;
+
+                // Record log
+                gameLog.push({
+                    question: currentQ.question,
+                    chosen: chosenWord,
+                    correct: currentQ.answer,
+                    isRight: false
+                });
+
+                showFloatingText(event.clientX, event.clientY, "答錯！", "text-rose-500");
+
+                // TRIGGER REQUIREMENT: 答錯暫停3秒
+                triggerPenalty();
+            }
+        }
+
+        function triggerPenalty() {
+            isPenalized = true;
+            penaltyCountdownVal = 3;
+
+            const overlay = document.getElementById('penalty-overlay');
+            const cdElem = document.getElementById('penalty-countdown');
+
+            overlay.classList.remove('hidden');
+            overlay.classList.add('penalty-active');
+            cdElem.innerText = penaltyCountdownVal;
+
+            const penaltyTimer = setInterval(() => {
+                penaltyCountdownVal--;
+                if (penaltyCountdownVal > 0) {
+                    cdElem.innerText = penaltyCountdownVal;
+                } else {
+                    clearInterval(penaltyTimer);
+                    hidePenalty();
+                }
+            }, 1000);
+        }
+
+        function hidePenalty() {
+            isPenalized = false;
+            const overlay = document.getElementById('penalty-overlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                overlay.classList.remove('penalty-active');
+            }
+        }
+
+        /* ====================================================================
+           VISUAL FX & PARTICLES
+           ==================================================================== */
+        function createWhackEffect(x, y, isCorrect) {
+            const effect = document.createElement('div');
+            effect.className = 'whack-effect z-50 text-4xl flex items-center justify-center';
+            effect.style.left = `${x - 30}px`;
+            effect.style.top = `${y - 40}px`;
+
+            const hammerMarkup = `
+                <div class="relative flex items-center justify-center">
+                    <svg width="56" height="56" viewBox="0 0 48 48" class="drop-shadow-xl">
+                        <g transform="rotate(-35 24 24)">
+                            <rect x="8" y="4" width="26" height="16" rx="4" fill="${isCorrect ? '#f97316' : '#ef4444'}" stroke="#7c2d12" stroke-width="2.5"/>
+                            <path d="M18 20 L28 43 C29 45 32 45 33 43 L37 39 C38 38 38 35 36 34 L25 20 Z" fill="#92400e" stroke="#451a03" stroke-width="2.5"/>
+                        </g>
+                    </svg>
+                    <span class="absolute -top-3 -right-3 text-3xl font-black drop-shadow-md">${isCorrect ? '💥' : '💢'}</span>
+                </div>
+            `;
+
+            effect.innerHTML = hammerMarkup;
+
+            document.body.appendChild(effect);
+            setTimeout(() => effect.remove(), 350);
+        }
+
+        function showFloatingText(x, y, text, colorClass) {
+            const textElem = document.createElement('div');
+            textElem.className = `float-text text-2xl font-black ${colorClass} drop-shadow-md z-50`;
+            textElem.style.left = `${x - 30}px`;
+            textElem.style.top = `${y - 20}px`;
+            textElem.innerText = text;
+
+            document.body.appendChild(textElem);
+            setTimeout(() => textElem.remove(), 800);
+        }
+
+        /* ====================================================================
+           GAME OVER & VOCABULARY MODAL
+           ==================================================================== */
+        function endGame() {
+            clearInterval(timerInterval);
+            clearInterval(moleSpawnInterval);
+            playSound('victory');
+
+            // Trigger celebration confetti
+            try {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } catch(e){}
+
+            // Update End Game Modal
+            document.getElementById('final-score').innerText = score;
+            const correctCount = gameLog.filter(item => item.isRight).length;
+            document.getElementById('final-correct').innerText = `${correctCount} / ${gameLog.length}`;
+
+            // Render log summary
+            const logContainer = document.getElementById('gameover-log');
+            if (gameLog.length === 0) {
+                logContainer.innerHTML = `<p class="text-slate-400 italic">尚無打地鼠紀錄</p>`;
+            } else {
+                logContainer.innerHTML = gameLog.map((item, idx) => `
+                    <div class="p-2 rounded-xl border ${item.isRight ? 'bg-emerald-50/70 border-emerald-200' : 'bg-rose-50/70 border-rose-200'} flex items-start gap-2">
+                        <span class="${item.isRight ? 'text-emerald-600' : 'text-rose-500'} font-bold">
+                            ${item.isRight ? '✓' : '✗'}
+                        </span>
+                        <div class="flex-1">
+                            <p class="font-bold text-slate-800">${item.question}</p>
+                            <p class="text-slate-500">你選擇：<span class="font-black ${item.isRight ? 'text-emerald-700' : 'text-rose-600'}">${item.chosen}</span> ${!item.isRight ? `(正確答案：<span class="text-emerald-700 font-bold">${item.correct}</span>)` : ''}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            document.getElementById('gameover-modal').classList.remove('hidden');
+        }
+
+        function closeGameOverModal() {
+            document.getElementById('gameover-modal').classList.add('hidden');
+        }
+
+        function openVocabModal() {
+            document.getElementById('vocab-modal').classList.remove('hidden');
+        }
+
+        function closeVocabModal() {
+            document.getElementById('vocab-modal').classList.add('hidden');
+        }
+
+        function populateVocabModalList() {
+            const list = document.getElementById('vocab-modal-list');
+            list.innerHTML = QUESTIONS_BANK.map((item, i) => `
+                <div class="p-3 bg-slate-50 hover:bg-amber-50 rounded-2xl border border-slate-200 transition">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded-lg">詞語 ${i+1}</span>
+                        <span class="text-base font-black text-amber-700">${item.answer}</span>
+                    </div>
+                    <p class="text-sm text-slate-700 font-bold">解釋：${item.hint}</p>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
